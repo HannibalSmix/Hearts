@@ -20,6 +20,10 @@
  * onEnteringState, onLeavingState and onPlayerActivationChange are predefined names that will be called by the framework.
  * When executing code in this state, you can access the args using this.args
  */
+
+const BgaAnimations = await importEsmLib('bga-animations', '1.x');
+const BgaCards = await importEsmLib('bga-cards', '1.x');
+
 class PlayerTurn {
     constructor(game, bga) {
         this.game = game;
@@ -108,35 +112,94 @@ export class Game {
         console.log( "Starting game setup" );
         this.gamedatas = gamedatas;
 
+        this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
+            <div id="myhand_wrap" class="whiteblock">
+                <b id="myhand_label">${_('My hand')}</b>
+                <div id="myhand">
+                    
+                </div>
+            </div>
+
+        `);
+
         // Example to add a div on the game area
         this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
             <div id="player-tables"></div>
         `);
         
         // Setting up player boards
-        Object.values(gamedatas.players).forEach(player => {
-            // example of setting up players boards
-            this.bga.playerPanels.getElement(player.id).insertAdjacentHTML('beforeend', `
-                <span id="energy-player-counter-${player.id}"></span> Energy
-            `);
-            const counter = new ebg.counter();
-            counter.create(`energy-player-counter-${player.id}`, {
-                value: player.energy,
-                playerCounter: 'energy',
-                playerId: player.id
-            });
-
-            // example of adding a div for each player
-            document.getElementById('player-tables').insertAdjacentHTML('beforeend', `
-                <div id="player-table-${player.id}">
-                    <strong>${player.name}</strong>
-                    <div>Helloo132132</div>
-                </div>
-            `);
+        const numPlayers = Object.keys(gamedatas.players).length;
+        Object.values(gamedatas.players).forEach((player, index) => {
+            document.getElementById("player-tables").insertAdjacentHTML(
+            "beforeend",
+            // we generate this html snippet for each player
+            `
+        <div class="playertable whiteblock playertable_${index}">
+            <div class="playertablename" style="color:#${player.color};">${player.name}</div>
+            <div id="tableau_${player.id}"></div>
+        </div>
+        `
+            );
         });
         
         // TODO: Set up your game interface here, according to "gamedatas"
-        
+        // create the animation manager, and bind it to the `game.bgaAnimationsActive()` function
+        this.animationManager = new BgaAnimations.Manager({
+            animationsActive: () => this.bga.gameui.bgaAnimationsActive(),
+        });
+
+        const cardWidth = 100;
+        const cardHeight = 135;
+
+        // create the card manager
+        this.cardsManager = new BgaCards.Manager({
+            animationManager: this.animationManager,
+            type: "ha-card", // the "type" of our cards in css
+            getId: (card) => card.id,
+
+            cardWidth: cardWidth,
+            cardHeight: cardHeight,
+            cardBorderRadius: "5%",
+            setupFrontDiv: (card, div) => {
+            div.dataset.type = card.type; // suit 1..4
+            div.dataset.typeArg = card.type_arg; // value 2..14
+            div.style.backgroundPositionX = `calc(100% / 14 * (${card.type_arg} - 2))`; // 14 is number of columns in stock image minus 1
+            div.style.backgroundPositionY = `calc(100% / 3 * (${card.type} - 1))`; // 3 is number of rows in stock image minus 1
+            this.bga.gameui.addTooltipHtml(div.id, `tooltip of ${card.type}`);
+            },
+        });
+
+        // create the stock, in the game setup
+        this.handStock = new BgaCards.HandStock(
+            this.cardsManager,
+            document.getElementById("myhand")
+        );
+
+        this.handStock.setSelectionMode("single");
+        this.handStock.onCardClick = (card) => {
+            alert("boom!");
+        };
+
+        // TODO: fix handStock
+        this.handStock.addCards([
+            { id: 1, type: 2, type_arg: 4 }, // 4 of hearts
+            { id: 2, type: 3, type_arg: 11 }, // Jack of clubs
+        ]); 
+
+        // map stocks
+        this.tableauStocks = [];
+        Object.values(gamedatas.players).forEach((player, index) => {
+            // add player tableau stock
+            this.tableauStocks[player.id] = new BgaCards.LineStock(
+                this.cardsManager,
+                document.getElementById(`tableau_${player.id}`)
+            );
+
+            // TODO: fix tableauStocks
+            this.tableauStocks[player.id].addCards([
+                { id: index + 10, type: index + 1, type_arg: index + 2 },
+            ]);
+        });
 
         // Setup game notifications to handle (see "setupNotifications" method below)
         this.setupNotifications();
