@@ -12,12 +12,15 @@ use Bga\Games\HeartsHannibalSmix\Game;
 
 class PlayerTurn extends GameState
 {
-    function __construct(
-        protected Game $game,
-    ) {
-        parent::__construct($game,
-            id: 10,
-            type: StateType::ACTIVE_PLAYER,
+    public function __construct(protected Game $game)
+    {
+        parent::__construct(
+            $game,
+            id: 31,
+            type: StateType::ACTIVE_PLAYER, // This state type means that one player is active and can do actions
+            description: clienttranslate('${actplayer} must play a card'), // We tell OTHER players what they are waiting for
+            descriptionMyTurn: clienttranslate('${you} must play a card'), // We tell the ACTIVE player what they must do
+            // We suround the code with clienttranslate() so that the text is sent to the client for translation (this will enable the game to support other languages)
         );
     }
 
@@ -43,32 +46,24 @@ class PlayerTurn extends GameState
      *
      * @throws UserException
      */
-    #[PossibleAction]
-    public function actPlayCard(int $card_id, int $activePlayerId, array $args)
+    #[PossibleAction] // a PHP attribute that tells BGA "this method describes a possible action that the player could take", so that you can call that action from the front (the client)
+    public function actPlayCard(int $cardId, int $activePlayerId)
     {
-        // check input values
-        $playableCardsIds = $args['playableCardsIds'];
-        if (!in_array($card_id, $playableCardsIds)) {
-            throw new UserException('Invalid card choice');
-        }
-
-        // Add your game logic to play a card here.
-        $card_name = Game::$CARD_TYPES[$card_id]['card_name'];
-
-        // Notify all players about the card played.
-        $this->bga->notify->all("cardPlayed", clienttranslate('${player_name} plays ${card_name}'), [
-            "player_id" => $activePlayerId,
-            "player_name" => $this->game->getPlayerNameById($activePlayerId), // remove this line if you uncomment notification decorator
-            "card_name" => $card_name, // remove this line if you uncomment notification decorator
-            "card_id" => $card_id,
-            "i18n" => ['card_name'], // remove this line if you uncomment notification decorator
-        ]);
-
-        // in this example, the player gains 1 points each time he plays a card
-        $this->bga->playerScore->inc($activePlayerId, 1);
-
-        // at the end of the action, move to the next state
-        return NextPlayer::class;
+        $game = $this->game;
+        $game->cards->moveCard($cardId, 'cardsontable', $activePlayerId);
+        // TODO: check rules here
+        $currentCard = $game->cards->getCard($cardId);
+        // And notify
+            $game->notify->all('playCard', clienttranslate('${player_name} plays ${value_displayed} ${color_displayed}'), [
+                'i18n' => array('color_displayed', 'value_displayed'),
+                'card' => $currentCard,
+                'player_id' => $activePlayerId,
+                'player_name' => $game->getPlayerNameById($activePlayerId),
+                'value_displayed' => $game->card_types['types'][$currentCard['type_arg']]['name'],
+                'color_displayed' => $game->card_types['suites'][$currentCard['type']]['name']
+            ]
+            );
+        return NextPlayer::class; // after the action, we move to the next player
     }
 
     /**
@@ -106,12 +101,11 @@ class PlayerTurn extends GameState
      * you must _never_ use `getCurrentPlayerId()` or `getCurrentPlayerName()`, 
      * but use the $playerId passed in parameter and $this->game->getPlayerNameById($playerId) instead.
      */
-    function zombie(int $playerId) {
-        // Example of zombie level 0: return NextPlayer::class; or $this->actPass($playerId);
-
-        // Example of zombie level 1:
-        $args = $this->getArgs();
-        $zombieChoice = $this->getRandomZombieChoice($args['playableCardsIds']); // random choice over possible moves
-        return $this->actPlayCard($zombieChoice, $playerId, $args); // this function will return the transition to the next state
+    public function zombie(int $playerId)
+    {
+        // We must implement this so BGA can auto play in the case a player becomes a zombie, but for this tutorial we won't handle this case
+        throw new \BgaUserException('Not implemented: zombie for player ${player_id}', args: [
+            'player_id' => $playerId,
+        ]);
     }
 }

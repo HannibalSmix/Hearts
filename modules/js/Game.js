@@ -41,7 +41,7 @@ class PlayerTurn {
       
         if (isCurrentPlayerActive) {
             const playableCardsIds = args.playableCardsIds; // returned by the PlayerTurn::getArgs
-
+            
             // Add test action buttons in the action status bar, simulating a card click:
             playableCardsIds.forEach(
                 cardId => this.bga.statusBar.addActionButton(_('Play card with id ${card_id}').replace('${card_id}', cardId), () => this.onCardClick(cardId))
@@ -65,17 +65,19 @@ class PlayerTurn {
     onPlayerActivationChange(args, isCurrentPlayerActive) {
     }
 
-    
-    onCardClick(card_id) {
-        console.log( 'onCardClick', card_id );
+    onUpdateActionButtons(args, stateName) {
+      console.log("onUpdateActionButtons: " + stateName, args);
 
-        this.bga.actions.performAction("actPlayCard", { 
-            card_id,
-        }).then(() =>  {                
-            // What to do after the server call if it succeeded
-            // (most of the time, nothing, as the game will react to notifs / change of state instead, so you can delete the `then`)
-        });        
+      if (this.isCurrentPlayerActive()) {
+        switch (stateName) {
+          case "playerTurn":
+            break;
+        }
+      }
     }
+
+    
+    
 }
 
 export class Game {
@@ -94,7 +96,6 @@ export class Game {
         // Example:
         // this.myGlobalValue = 0;
     }
-    
     /*
         setup:
         
@@ -107,6 +108,26 @@ export class Game {
         
         "gamedatas" argument contains all datas retrieved by your "getAllDatas" PHP method.
     */
+       
+    onCardClick(card){
+        console.log("onCardClick", card);
+        if (!card) return; // hmm
+        switch (this.gamedatas.gamestate.name) {
+            case "PlayerTurn":
+                // Can play a card
+                this.bga.actions.performAction("actPlayCard", {
+                    cardId: card.id, // this corresponds to the argument name in php, so it needs to be exactly the same
+                });
+                break;
+            case "GiveCards":
+                // Can give cards TODO
+                break;
+            default: {
+                this.handStock.unselectAll();
+                break;
+            }
+        }       
+    }
     
     setup( gamedatas ) {
         console.log( "Starting game setup" );
@@ -136,11 +157,13 @@ export class Game {
             `
         <div class="playertable whiteblock playertable_${index}">
             <div class="playertablename" style="color:#${player.color};">${player.name}</div>
-            <div id="tableau_${player.id}"></div>
+            <div id="tableau_${player.id}" class="tableau"></div>
+            <div id="cardswon_${player.id}" class="cardswon"></div>
         </div>
         `
             );
         });
+
         
         // TODO: Set up your game interface here, according to "gamedatas"
         // create the animation manager, and bind it to the `game.bgaAnimationsActive()` function
@@ -177,14 +200,11 @@ export class Game {
 
         this.handStock.setSelectionMode("single");
         this.handStock.onCardClick = (card) => {
-            alert("boom!");
+            this.onCardClick(card);
         };
 
         // TODO: fix handStock
-        this.handStock.addCards([
-            { id: 1, type: 2, type_arg: 4 }, // 4 of hearts
-            { id: 2, type: 3, type_arg: 11 }, // Jack of clubs
-        ]); 
+        this.handStock.addCards(Array.from(Object.values(this.gamedatas.hand)));
 
         // map stocks
         this.tableauStocks = [];
@@ -194,12 +214,23 @@ export class Game {
                 this.cardsManager,
                 document.getElementById(`tableau_${player.id}`)
             );
-
-            // TODO: fix tableauStocks
-            this.tableauStocks[player.id].addCards([
-                { id: index + 10, type: index + 1, type_arg: index + 2 },
-            ]);
+            // add void stock
+            new BgaCards.VoidStock(
+                this.cardsManager,
+                document.getElementById(`cardswon_${player.id}`),
+                {
+                autoPlace: (card) =>
+                    card.location === "cardswon" && card.location_arg == player.id,
+                }
+            );
         });
+
+        // Cards played on table
+        for (i in this.gamedatas.cardsontable) {
+            var card = this.gamedatas.cardsontable[i];
+            var player_id = card.location_arg;
+            this.tableauStocks[player_id].addCards([card]);
+        }
 
         // Setup game notifications to handle (see "setupNotifications" method below)
         this.setupNotifications();
@@ -241,7 +272,30 @@ export class Game {
     }
     
     // TODO: from this point and below, you can write your game notifications handling methods
-    
+    notif_newHand(args) {
+      // We received a new full hand of 13 cards.
+      this.handStock.removeAll();
+      this.handStock.addCards(Array.from(Object.values(args.hand)));
+    }
+
+    notif_playCard(args) {
+      // Play a card on the table
+      this.tableauStocks[args.player_id].addCards([args.card]);
+    }
+
+    async notif_trickWin() {
+    // We do nothing here (just wait in order players can view the 4 cards played before they're gone)
+    }
+
+    async notif_giveAllCardsToPlayer(args) {
+        // Move all cards on table to given table, then destroy them
+        const winner_id = args.player_id;
+
+        const cards = Array.from(Object.values(args.cards));
+        await this.tableauStocks[winner_id].addCards(cards);
+        await this.cardsManager.placeCards(cards); // auto-placement
+    }
+
     /*
     Example:
     async notif_cardPlayed( args ) {
