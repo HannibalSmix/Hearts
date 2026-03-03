@@ -74,9 +74,10 @@
 }
 
 #player-tables {
-  position: relative;
-  width: calc(var(--h-tableau-width) * 3.9);
-  height: calc(var(--h-tableau-height) * 2.4);
+ position: relative;
+ width: calc(var(--h-tableau-width) * 3.8);
+ height: calc(var(--h-tableau-height) * 2.4);
+ margin: auto; // that is a cheap way to make it centered
 }
 
 .ha-card-front {
@@ -136,3 +137,4 @@
   position: absolute;
   top: 0 !important;
 } 
+

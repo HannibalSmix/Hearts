@@ -40,12 +40,25 @@ class PlayerTurn {
         );
       
         if (isCurrentPlayerActive) {
-            const playableCardsIds = args.playableCardsIds; // returned by the PlayerTurn::getArgs
+            //const playableCardsIds = args.playableCardsIds; // returned by the PlayerTurn::getArgs
+            //const playableCardIds = args.playableCards.map(id => parseInt(id));
+            const playableCardIds = args._private.playableCards.map((x) =>
+              parseInt(x)
+            ); 
+            
+            const allCards = this.game.handStock.getCards();
+
+            const playableCards = allCards.filter(
+                card => playableCardIds.includes(parseInt(card.id))
+            );
+
+            this.game.handStock.setSelectionMode("single", playableCards);
+            //this.game.handStock.setSelectableItems(playableCards);
             
             // Add test action buttons in the action status bar, simulating a card click:
-            playableCardsIds.forEach(
-                cardId => this.bga.statusBar.addActionButton(_('Play card with id ${card_id}').replace('${card_id}', cardId), () => this.onCardClick(cardId))
-            ); 
+            // playableCardsIds.forEach(
+            //     cardId => this.bga.statusBar.addActionButton(_('Play card with id ${card_id}').replace('${card_id}', cardId), () => this.onCardClick(cardId))
+            // ); 
 
             this.bga.statusBar.addActionButton(_('Pass'), () => this.bga.actions.performAction("actPass"), { color: 'secondary' }); 
         }
@@ -164,6 +177,10 @@ export class Game {
             );
         });
 
+        // Hide hand zone from spectators
+        if (this.isSpectator)
+            document.getElementById("myhand_wrap").style.display = "none";
+
         
         // TODO: Set up your game interface here, according to "gamedatas"
         // create the animation manager, and bind it to the `game.bgaAnimationsActive()` function
@@ -198,7 +215,7 @@ export class Game {
             document.getElementById("myhand")
         );
 
-        this.handStock.setSelectionMode("single");
+        //this.handStock.setSelectionMode("single");
         this.handStock.onCardClick = (card) => {
             this.onCardClick(card);
         };

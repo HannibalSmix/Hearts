@@ -29,14 +29,17 @@ class PlayerTurn extends GameState
      *
      * This method returns some additional information that is very specific to the `PlayerTurn` game state.
      */
-    public function getArgs(): array
+    public function getArgs(int $activePlayerId): array
     {
-        // Get some values from the current game situation from the database.
-
+        // Send playable card ids of the active player privately
         return [
-            "playableCardsIds" => [1, 2],
+            '_private' => [
+                $activePlayerId => [
+                    'playableCards' => $this->game->getPlayableCards($activePlayerId)
+                ],
+            ],
         ];
-    }    
+    }   
 
     /**
      * Player action, example content.
@@ -50,10 +53,42 @@ class PlayerTurn extends GameState
     public function actPlayCard(int $cardId, int $activePlayerId)
     {
         $game = $this->game;
-        $game->cards->moveCard($cardId, 'cardsontable', $activePlayerId);
-        // TODO: check rules here
         $currentCard = $game->cards->getCard($cardId);
+        if (!$currentCard) {
+            throw new \BgaSystemException("Invalid move");
+        }
+        // Rule checks
+        $playable_cards = $game->getPlayableCards($activePlayerId);
+        if (!in_array($cardId, $playable_cards)) {
+            throw new \BgaUserException(clienttranslate("You cannot play this card now"));
+        }
+
+        // // Check that player has this card in hand
+        // if ($currentCard['location'] != "hand") {
+        //     throw new \BgaUserException(
+        //         clienttranslate('You do not have this card in your hand')
+        //     );
+        // }
+        $currenttrick_color = $game->getGameStateValue('trick_color');
+        // Check that player follows suit if possible
+        if ($currenttrick_color != 0) {
+            $has_suit = false;
+            $hand_cards = $game->cards->getCardsInLocation('hand', $activePlayerId);
+            foreach ($hand_cards as $hand_card) {
+                if ($hand_card['type'] == $currenttrick_color) {
+                    $has_suit = true;
+                    break;
+                }
+            }
+            if ($has_suit && $currentCard['type'] != $currenttrick_color) {
+                throw new \BgaUserException(
+                    clienttranslate('You must follow suit')
+                );
+            }
+        }
         // And notify
+
+
             $game->notify->all('playCard', clienttranslate('${player_name} plays ${value_displayed} ${color_displayed}'), [
                 'i18n' => array('color_displayed', 'value_displayed'),
                 'card' => $currentCard,
@@ -82,11 +117,13 @@ class PlayerTurn extends GameState
         ]);
 
         // in this example, the player gains 1 energy each time he passes
-        $this->game->playerEnergy->inc($activePlayerId, 1);
+        //$this->game->playerEnergy->inc($activePlayerId, 1);
 
         // at the end of the action, move to the next state
         return NextPlayer::class;
     }
+
+     
 
     /**
      * This method is called each time it is the turn of a player who has quit the game (= "zombie" player).
@@ -103,9 +140,8 @@ class PlayerTurn extends GameState
      */
     public function zombie(int $playerId)
     {
-        // We must implement this so BGA can auto play in the case a player becomes a zombie, but for this tutorial we won't handle this case
-        throw new \BgaUserException('Not implemented: zombie for player ${player_id}', args: [
-            'player_id' => $playerId,
-        ]);
+        $playable_cards = $this->game->getPlayableCards($playerId);
+        $zombieChoice = $this->getRandomZombieChoice($playable_cards); // random choice over possible moves
+        return $this->actPlayCard((int)$zombieChoice, $playerId);
     }
 }

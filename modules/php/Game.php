@@ -19,13 +19,12 @@ declare(strict_types=1);
 namespace Bga\Games\HeartsHannibalSmix;
 
 use Bga\Games\HeartsHannibalSmix\States\PlayerTurn;
+use Bga\Games\HeartsHannibalSmix\States\NewHand;
 use Bga\GameFramework\Components\Counters\PlayerCounter;
 use Bga\GameFramework\Components\Deck;
 
 class Game extends \Bga\GameFramework\Table
 {
-  
-    public PlayerCounter $playerEnergy;
 
     public array $card_types;
 
@@ -48,8 +47,6 @@ class Game extends \Bga\GameFramework\Table
         ); // mandatory, even if the array is empty
 
         $this->cards = $this->deckFactory->createDeck('card'); // card is the our database name
-
-        $this->playerEnergy = $this->bga->counterFactory->createPlayerCounter('energy');
 
         $this->card_types = [
             "suites" => [
@@ -171,7 +168,6 @@ class Game extends \Bga\GameFramework\Table
         $result["players"] = $this->getCollectionFromDb(
             "SELECT `player_id` AS `id`, `player_score` AS `score` FROM `player`"
         );
-        $this->playerEnergy->fillResult($result);
 
         // Cards in player hand
         $result['hand'] = $this->cards->getCardsInLocation('hand', $current_player_id);
@@ -190,7 +186,6 @@ class Game extends \Bga\GameFramework\Table
      */
     protected function setupNewGame($players, $options = [])
     {
-        $this->playerEnergy->initDb(array_keys($players), initialValue: 2);
 
         // Set the colors of the players with HTML color code. The default below is red/green/blue/orange/brown. The
         // number of colors defined here must correspond to the maximum number of players allowed for the gams.
@@ -245,18 +240,75 @@ class Game extends \Bga\GameFramework\Table
         }
         $this->cards->createCards($cards, 'deck');
 
-        // Shuffle deck
-        $this->cards->shuffle('deck');
-        // Deal 13 cards to each players
-        $players = $this->loadPlayersBasicInfos();
-        foreach ($players as $player_id => $player) {
-            $this->cards->pickCards(13, 'deck', $player_id);
-        }
+        // // Shuffle deck
+        // $this->cards->shuffle('deck');
+        // // Deal 13 cards to each players
+        // $players = $this->loadPlayersBasicInfos();
+        // foreach ($players as $player_id => $player) {
+        //     $this->cards->pickCards(13, 'deck', $player_id);
+        // }
 
         // Activate first player once everything has been initialized and ready.
         $this->activeNextPlayer();
 
-        return PlayerTurn::class;
+        //return PlayerTurn::class;
+        return NewHand::class;
+    }
+
+    function getPlayableCards($player_id): array
+    {
+        // Get all data needed to check playable cards at the moment
+        $currentTrickColor = $this->getGameStateValue('trick_color');
+        $broken_heart = $this->brokenHeart();
+        $total_played = $this->cards->countCardInLocation('cardswon') + $this->cards->countCardInLocation('cardsontable');
+        $hand = $this->cards->getPlayerHand($player_id);
+
+        $playable_card_ids = [];
+        $all_ids = array_keys($hand);
+
+
+        if ($this->cards->getCardsInLocation('cardsontable', $player_id)) return []; // Already played a card
+
+        // Check whether the first card of the hand has been played or not
+        if ($total_played == 0) {
+            // No cards have been played yet, find and return the starter card only
+            foreach ($hand as $card) if ($card['type'] == 3 && $card['type_arg'] == 2) return [$card['id']]; // 2 of clubs
+            return [];
+        } else {
+
+            if (!$currentTrickColor) { // First card of the trick
+                if ($broken_heart) return $all_ids; // Broken Heart or no limitation, can play any card
+                else {
+                    // Exclude Heart as Heart hasn't been broken yet
+                    foreach ($hand as $card) if ($card['type'] != 2) $playable_card_ids[] = $card['id'];
+                    if (!$playable_card_ids) return $all_ids; // All Heart cards!
+                    else return $playable_card_ids;
+                }
+            } else {
+                // Must follow the lead suit if possible
+                $same_suit = false;
+                foreach ($hand as $card)
+                    if ($card['type'] == $currentTrickColor) {
+                        $same_suit = true;
+                        break;
+                    }
+                if ($same_suit) return $this->getObjectListFromDB("SELECT card_id FROM card WHERE card_type = $currentTrickColor AND card_location = 'hand' AND card_location_arg = $player_id", true); // Has at least 1 card of the same suit
+
+                else return $all_ids;
+            }
+        }
+    }
+
+    function brokenHeart(): bool
+    {
+        // Check Heart in the played card piles
+        return (bool)$this->getUniqueValueFromDB("SELECT count(*) FROM card WHERE card_location = 'cardswon' AND card_type = 2");
+    }
+
+    function tableHeart(): bool
+    {
+        // Check Heart in the current trick
+        return (bool)$this->getUniqueValueFromDB("SELECT count(*) FROM card WHERE card_location = 'cardsontable' AND card_type = 2");
     }
 
     /**
@@ -271,8 +323,8 @@ class Game extends \Bga\GameFramework\Table
     /**
      * Another example of debug function, to easily test the zombie code.
      */
-    public function debug_playOneMove() {
-        $this->bga->debug->playUntil(fn(int $count) => $count == 1);
+    public function debug_playOneMove() { 
+        $this->bga->debug->playUntil(fn(int $count) => $count == 6);
     }
 
     /*
@@ -283,5 +335,5 @@ class Game extends \Bga\GameFramework\Table
         $card = array_values($this->cards->getCardsOfType($cardType))[0];
         $this->cards->moveCard($card['id'], 'hand', $playerId);
     }
-    */
-}
+    */ 
+} 

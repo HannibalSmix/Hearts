@@ -14,13 +14,14 @@ class NewHand extends GameState
       $game,
       id: 2, // the idea of the state
       type: StateType::GAME, // This type means that no player is active, and the game will automatically progress
-      updateGameProgression: true, // entering this state can update the progress bar of the game
+      updateGameProgression: true, // entering this state can update the progress bar of the gamee
     );
   }
 
   // The action we do when entering the state
   public function onEnteringState()
-  {
+  { 
+    //echo 'ehooooooo';
     $game = $this->game;
     // Take back all cards (from any location => null) to deck
     $game->cards->moveAllCardsInLocation(null, "deck");
@@ -38,8 +39,10 @@ class NewHand extends GameState
     $this->game->setGameStateInitialValue('trick_color', 0);
 
     // FIXME: first player one with 2 of clubs
-    $first_player = (int) $this->game->getActivePlayerId();
+    // first player one with 2 of clubs
+    $first_player = $this->game->getUniqueValueFromDb("SELECT card_location_arg FROM card WHERE card_location = 'hand' AND card_type = 3 AND card_type_arg = 2");// 2 of clubs
     $this->game->gamestate->changeActivePlayer($first_player);
     return PlayerTurn::class;
+    //$this->game->gamestate->nextState('next');
   }
 }
