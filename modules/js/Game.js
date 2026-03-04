@@ -171,11 +171,18 @@ export class Game {
         <div class="playertable whiteblock playertable_${index}">
             <div class="playertablename" style="color:#${player.color};">${player.name}</div>
             <div id="tableau_${player.id}" class="tableau"></div>
-            <div id="cardswon_${player.id}" class="cardswon"></div>
+            
         </div>
         `
             );
-        });
+            document.getElementById(`player_panel_content_${player.color}`).innerHTML = 
+         `<div id="otherhand_${player.id}" class="otherhand"><i class="fa fa-window-restore"></i></div>`;
+            // add tooltips to player hand symbol
+            this.bga.gameui.addTooltipHtml(
+                `otherhand_${player.id}`,
+                _("Placeholder for player's hand")
+       );
+        });//<div id="cardswon_${player.id}" class="cardswon"></div>
 
         // Hide hand zone from spectators
         if (this.isSpectator)
@@ -205,7 +212,10 @@ export class Game {
             div.dataset.typeArg = card.type_arg; // value 2..14
             div.style.backgroundPositionX = `calc(100% / 14 * (${card.type_arg} - 2))`; // 14 is number of columns in stock image minus 1
             div.style.backgroundPositionY = `calc(100% / 3 * (${card.type} - 1))`; // 3 is number of rows in stock image minus 1
-            this.bga.gameui.addTooltipHtml(div.id, `tooltip of ${card.type}`);
+            this.bga.gameui.addTooltipHtml(div.id, 
+                    _(this.gamedatas.card_types.types[card.type_arg].name)+ " " +
+                    _(this.gamedatas.card_types.suites[card.type].name) 
+                );
             },
         });
 
@@ -236,14 +246,14 @@ export class Game {
                 document.getElementById(`tableau_${player.id}`)
             );
             // add void stock
-            new BgaCards.VoidStock(
+            /*new BgaCards.VoidStock(
                 this.cardsManager,
                 document.getElementById(`cardswon_${player.id}`),
                 {
                 autoPlace: (card) =>
                     card.location === "cardswon" && card.location_arg == player.id,
                 }
-            );
+            );*/
         });
 
         // Cards played on table
@@ -320,23 +330,44 @@ export class Game {
       this.handStock.addCards(this.remapToBgaCardList(args.hand));
     }
 
-    notif_playCard(args) {
+    async notif_playCard(args) {
       // Play a card on the table
       //this.tableauStocks[args.player_id].addCards([args.card]);
-      this.tableauStocks[args.player_id].addCard(this.remapToBgaCard(args.card));
+      const playerId = args.player_id;
+      let settings = {};
+      if (playerId != this.player_id) {
+        settings = {
+          fromElement: $(`otherhand_${playerId}`),
+          toPlaceholder: "grow",
+        };
+      }
+      await this.tableauStocks[playerId].addCard(args.card, settings);
+      //await this.tableauStocks[args.player_id].addCard(this.remapToBgaCard(args.card));
     }
 
     async notif_trickWin() {
     // We do nothing here (just wait in order players can view the 4 cards played before they're gone)
     }
 
-    async notif_giveAllCardsToPlayer(args) {
+   /* async notif_giveAllCardsToPlayer(args) {
         // Move all cards on table to given table, then destroy them
         const winner_id = args.player_id;
 
         const cards = this.remapToBgaCardList(args.cards);
         await this.tableauStocks[winner_id].addCards(cards);
         await this.cardsManager.placeCards(cards); // auto-placement
+    }*/
+
+    async notif_giveAllCardsToPlayer(args) {
+      // Move all cards from notification to dedicated player area and fade out
+      const playerId = args.player_id;
+
+      const cards = Array.from(Object.values(args.cards));
+      await this.tableauStocks[playerId].addCards(cards);
+      await this.tableauStocks[playerId].removeCards(cards, {
+        fadeOut: true,
+        slideTo: $(`otherhand_${playerId}`),
+      });
     }
 
     /*

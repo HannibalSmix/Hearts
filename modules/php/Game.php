@@ -116,8 +116,9 @@ class Game extends \Bga\GameFramework\Table
     public function getGameProgression()
     {
         // TODO: compute and return the game progression
-
-        return 0;
+        $min = $this->playerScore->getMin();
+        return -1 * $min; // we get close to -100 we get close to 100% game completion
+        //return 0;
     }
 
     /**
@@ -174,6 +175,8 @@ class Game extends \Bga\GameFramework\Table
 
         // Cards played on the table
         $result['cardsontable'] = $this->cards->getCardsInLocation('cardsontable');
+
+        $result['card_types'] = $this->card_types;
 
         // TODO: Gather all information about current game situation (visible by player $currentPlayerId).
 
