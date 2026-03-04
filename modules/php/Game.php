@@ -85,7 +85,7 @@ class Game extends \Bga\GameFramework\Table
          /* notification decorator */
         $this->notify->addDecorator(function(string $message, array $args) {
             if (isset($args['player_id']) && !isset($args['player_name']) && str_contains($message, '${player_name}')) {
-                $args['player_name'] = $this->getPlayerNameById($args['player_id']);
+                $args['player_name'] = $this->getPlayerNameById((int)$args['player_id']);
             }
     
             return $args;
@@ -273,7 +273,7 @@ class Game extends \Bga\GameFramework\Table
         if ($total_played == 0) {
             // No cards have been played yet, find and return the starter card only
             foreach ($hand as $card) if ($card['type'] == 3 && $card['type_arg'] == 2) return [$card['id']]; // 2 of clubs
-            return [];
+            return $all_ids; // should not happen
         } else {
 
             if (!$currentTrickColor) { // First card of the trick

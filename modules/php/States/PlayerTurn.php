@@ -86,18 +86,20 @@ class PlayerTurn extends GameState
                 );
             }
         }
+
+        
+        $game->cards->moveCard($cardId, 'cardsontable', $activePlayerId);
         // And notify
+        $game->notify->all('playCard', clienttranslate('${player_name} plays ${value_displayed} ${color_displayed}'), [
+            'i18n' => array('color_displayed', 'value_displayed'),
+            'card' => $currentCard,
+            'player_id' => $activePlayerId,
+            'player_name' => $game->getPlayerNameById($activePlayerId),
+            'value_displayed' => $game->card_types['types'][$currentCard['type_arg']]['name'],
+            'color_displayed' => $game->card_types['suites'][$currentCard['type']]['name']
+        ]
+        );
 
-
-            $game->notify->all('playCard', clienttranslate('${player_name} plays ${value_displayed} ${color_displayed}'), [
-                'i18n' => array('color_displayed', 'value_displayed'),
-                'card' => $currentCard,
-                'player_id' => $activePlayerId,
-                'player_name' => $game->getPlayerNameById($activePlayerId),
-                'value_displayed' => $game->card_types['types'][$currentCard['type_arg']]['name'],
-                'color_displayed' => $game->card_types['suites'][$currentCard['type']]['name']
-            ]
-            );
         return NextPlayer::class; // after the action, we move to the next player
     }
 
@@ -106,7 +108,7 @@ class PlayerTurn extends GameState
      *
      * In this scenario, each time a player pass, this method will be called. This method is called directly
      * by the action trigger on the front side with `bgaPerformAction`.
-     */
+     *//*
     #[PossibleAction]
     public function actPass(int $activePlayerId)
     {
@@ -121,7 +123,7 @@ class PlayerTurn extends GameState
 
         // at the end of the action, move to the next state
         return NextPlayer::class;
-    }
+    }*/
 
      
 

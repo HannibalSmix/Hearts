@@ -21,47 +21,49 @@ class NextPlayer extends GameState
   {
     $game = $this->game;
     // Active next player OR end the trick and go to the next trick OR end the hand
+    $coun=$game->cards->countCardInLocation('cardsontable');
+    $game->debug("COUUOUUUOUUUNNNNTNNTNNTNTT:::  ".$coun." :::---------");
     if ($game->cards->countCardInLocation('cardsontable') == 4) {
       // This is the end of the trick
-        $cards_on_table = $game->cards->getCardsInLocation('cardsontable');
-        $best_value = 0;
-        $best_value_player_id = $this->game->getActivePlayerId(); // fallback 
-        $currenttrick_color = $game->getGameStateValue('trick_color');
-        foreach ($cards_on_table as $card) {
-            if ($card['type'] == $currenttrick_color) {   // type is card suite
-                if ($best_value_player_id === null || $card['type_arg'] > $best_value) {
-                    $best_value_player_id = $card['location_arg']; // location_arg is player who played this card on table
-                    $best_value = $card['type_arg']; // type_arg is value of the card (2 to 14)
-                }
-            }
-        }
+      $cards_on_table = $game->cards->getCardsInLocation('cardsontable');
+      $best_value = 0;
+      $best_value_player_id = $this->game->getActivePlayerId(); // fallback 
+      $currenttrick_color = $game->getGameStateValue('trick_color');
+      foreach ($cards_on_table as $card) {
+          if ($card['type'] == $currenttrick_color) {   // type is card suite
+              if ($best_value_player_id === null || $card['type_arg'] > $best_value) {
+                  $best_value_player_id = $card['location_arg']; // location_arg is player who played this card on table
+                  $best_value = $card['type_arg']; // type_arg is value of the card (2 to 14)
+              }
+          }
+      }
 
-        // Active this player => he's the one who starts the next trick
-        $this->gamestate->changeActivePlayer($best_value_player_id);
+      // Active this player => he's the one who starts the next trick
+      $this->gamestate->changeActivePlayer($best_value_player_id);
 
-        // Move all win cards to cardswon location
-        $win_location = 'cardswon';
-        $game->cards->moveAllCardsInLocation('cardsontable', $win_location, null, $best_value_player_id);
-        // ... notification is the same as before
-        // // This is the end of the trick
-        // // Select the winner
-        // $best_value_player_id = $game->activeNextPlayer(); // TODO figure out winner of trick
+      // Move all win cards to cardswon location
+      //$win_location = 'cardswon';
+      //$game->cards->moveAllCardsInLocation('cardsontable', $win_location, null, $best_value_player_id);
+      // ... notification is the same as before
+      // // This is the end of the trick
+      // // Select the winner
+      // $best_value_player_id = $game->activeNextPlayer(); // TODO figure out winner of trick
 
-        // // Move all win cards to cardswon location
-        // $moved_cards = $game->cards->getCardsInLocation('cardsontable'); // remember for notification what we moved
-        // $game->cards->moveAllCardsInLocation('cardsontable', 'cardswon', null, $best_value_player_id);
+      // // Move all win cards to cardswon location
+      //$moved_cards = $game->cards->getCardsInLocation('cardsontable'); // remember for notification what we moved
+      $game->cards->moveAllCardsInLocation('cardsontable', 'cardswon', null, $best_value_player_id);
 
-        // // Note: we use 2 notifications here in order we can pause the display during the first notification
-        // //  before we move all cards to the winner (during the second)
-        // $players = $game->loadPlayersBasicInfos();
-        $game->notify->all('trickWin', clienttranslate('${player_name} wins the trick'), array(
-            'player_id' => $best_value_player_id,
-        ));
+      // // Note: we use 2 notifications here in order we can pause the display during the first notification
+      // //  before we move all cards to the winner (during the second)
+      // $players = $game->loadPlayersBasicInfos();
+      $game->notify->all('trickWin', clienttranslate('${player_name} wins the trick'), array(
+          'player_id' => $best_value_player_id,
+      ));
 
-        $game->notify->all('giveAllCardsToPlayer', '', array(
-            'player_id' => $best_value_player_id,
-            'cards' => $game->cards->getCards(array_keys($cards_on_table))
-        ));
+      $game->notify->all('giveAllCardsToPlayer', '', array(
+          'player_id' => $best_value_player_id,
+          'cards' => $game->cards->getCards(array_keys($cards_on_table))
+      ));
 
       if ($game->cards->countCardInLocation('hand') == 0) {
         // End of the hand

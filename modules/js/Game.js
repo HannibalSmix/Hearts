@@ -212,7 +212,10 @@ export class Game {
         // create the stock, in the game setup
         this.handStock = new BgaCards.HandStock(
             this.cardsManager,
-            document.getElementById("myhand")
+            document.getElementById("myhand"),
+            {
+                sort: BgaCards.sort('type', 'type_arg'), // sort by suite then by value
+            }
         );
 
         //this.handStock.setSelectionMode("single");
@@ -221,7 +224,8 @@ export class Game {
         };
 
         // TODO: fix handStock
-        this.handStock.addCards(Array.from(Object.values(this.gamedatas.hand)));
+        //this.handStock.addCards(Array.from(Object.values(this.gamedatas.hand)));
+        this.handStock.addCards(this.remapToBgaCardList(this.gamedatas.hand));
 
         // map stocks
         this.tableauStocks = [];
@@ -246,7 +250,7 @@ export class Game {
         for (i in this.gamedatas.cardsontable) {
             var card = this.gamedatas.cardsontable[i];
             var player_id = card.location_arg;
-            this.tableauStocks[player_id].addCards([card]);
+            this.tableauStocks[player_id].addCards(this.remapToBgaCardList(card));
         }
 
         // Setup game notifications to handle (see "setupNotifications" method below)
@@ -264,7 +268,28 @@ export class Game {
         script. Typically, functions that are used in multiple state classes or outside a state class.
     
     */
+    remapToBgaCardList(cards) {
+        if (!cards) return [];
+        if (cards.type) {
+        // actually one card
+            return [this.remapToBgaCard(cards)];
+        } else if (Array.isArray(cards)) {
+            return cards.map((card) => this.remapToBgaCard(card));
+        } else {
+            return Object.values(cards).map((card) => this.remapToBgaCard(card));
+        }
+    }
 
+    remapToBgaCard(card) {
+        // proper casts
+        return {
+            id: parseInt(card.id),
+            type: parseInt(card.type),
+            type_arg: parseInt(card.type_arg),
+            location: card.location,
+            location_arg: parseInt(card.location_arg),
+        };
+    }
     
     ///////////////////////////////////////////////////
     //// Reaction to cometD notifications
@@ -292,12 +317,13 @@ export class Game {
     notif_newHand(args) {
       // We received a new full hand of 13 cards.
       this.handStock.removeAll();
-      this.handStock.addCards(Array.from(Object.values(args.hand)));
+      this.handStock.addCards(this.remapToBgaCardList(args.hand));
     }
 
     notif_playCard(args) {
       // Play a card on the table
-      this.tableauStocks[args.player_id].addCards([args.card]);
+      //this.tableauStocks[args.player_id].addCards([args.card]);
+      this.tableauStocks[args.player_id].addCard(this.remapToBgaCard(args.card));
     }
 
     async notif_trickWin() {
@@ -308,7 +334,7 @@ export class Game {
         // Move all cards on table to given table, then destroy them
         const winner_id = args.player_id;
 
-        const cards = Array.from(Object.values(args.cards));
+        const cards = this.remapToBgaCardList(args.cards);
         await this.tableauStocks[winner_id].addCards(cards);
         await this.cardsManager.placeCards(cards); // auto-placement
     }
